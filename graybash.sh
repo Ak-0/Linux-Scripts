@@ -60,11 +60,13 @@ Please Select whhat prompt you want to use.
 		case $option in 
 			1)
 				makeBkup
-				export PS1= ${Black}${On_White}">["${BBlack}" \u@\T "${Black}${On_White}"]:\w:\\$\[$(tput sgr0)\]"${NC} 
+				bash  --rcfile <(echo "PS1='>[ \[$(tput sgr0)\]\[\033[38;5;241m\]\u\[$(tput sgr0)\]\[\033[38;5;15m\]@\[$(tput sgr0)\]\[\033[38;5;8m\]\@\[$(tput sgr0)\]\[\033[38;5;15m\] ]:\w:\\$\[$(tput sgr0)\]'") -i
+				clear
 		;;
 			2)
 				makeBkup
-				export PS1="[\[$(tput sgr0)\]\[\033[38;5;246m\]\A\[$(tput sgr0)\]\[\033[38;5;15m\]]\w\[$(tput bold)\]\[$(tput sgr0)\]\[\033[38;5;243m\]>\[$(tput sgr0)\]"
+				 bash --rcfile <(echo " PS1='[\[$(tput sgr0)\]\[\033[38;5;246m\]\A\[$(tput sgr0)\]\[\033[38;5;15m\]]\w\[$(tput bold)\]\[$(tput sgr0)\]\[\033[38;5;243m\]>\[$(tput sgr0)\]'") -i
+				clear
 		;;
 		esac
 
