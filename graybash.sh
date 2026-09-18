@@ -18,22 +18,22 @@
 # Source the script (or ~/.bashrc after apply) to change the current shell:
 #   source ./graybash.sh apply classic
 
-SCRIPT_NAME="graybash"
-BASHRC="${GRAYBASH_BASHRC:-$HOME/.bashrc}"
-BACKUP="${BASHRC}.graybash.bak"
-MARKER_BEGIN="# >>> graybash >>>"
-MARKER_END="# <<< graybash <<<"
+_graybash_name="graybash"
+_graybash_bashrc="${GRAYBASH_BASHRC:-$HOME/.bashrc}"
+_graybash_backup="${_graybash_bashrc}.graybash.bak"
+_graybash_begin="# >>> graybash >>>"
+_graybash_end="# <<< graybash <<<"
 
 # Greyscale UI (black on white header, 256-color body). Disabled when stdout
 # is not a terminal, or when NO_COLOR is set.
 if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
-  C_RESET=$'\e[0m'
-  C_HEAD=$'\e[0;30;47m'
-  C_DIM=$'\e[38;5;245m'
-  C_FG=$'\e[38;5;252m'
-  C_BOLD=$'\e[1;37m'
+  _GB_RESET=$'\e[0m'
+  _GB_HEAD=$'\e[0;30;47m'
+  _GB_DIM=$'\e[38;5;245m'
+  _GB_FG=$'\e[38;5;252m'
+  _GB_BOLD=$'\e[1;37m'
 else
-  C_RESET="" C_HEAD="" C_DIM="" C_FG="" C_BOLD=""
+  _GB_RESET="" _GB_HEAD="" _GB_DIM="" _GB_FG="" _GB_BOLD=""
 fi
 
 is_sourced() {
@@ -45,7 +45,11 @@ say() {
 }
 
 die() {
-  say "${C_HEAD} ${SCRIPT_NAME} ${C_RESET} $*" >&2
+  if [[ -n "$_GB_HEAD" ]]; then
+    say "${_GB_HEAD} ${_graybash_name} ${_GB_RESET} $*" >&2
+  else
+    say "${_graybash_name}: $*" >&2
+  fi
   if is_sourced; then
     return 1
   fi
@@ -125,9 +129,10 @@ render_preview() {
 }
 
 banner() {
-  say "${C_HEAD}                                                                        "
-  say "  ${SCRIPT_NAME}  ·  grayscale bash prompts for ${USER:-$(id -un)}@$(hostname -s 2>/dev/null || hostname)  "
-  say "                                                                        ${C_RESET}"
+  local who host
+  who="${USER:-$(id -un)}"
+  host="$(hostname -s 2>/dev/null || hostname)"
+  say "${_GB_HEAD} ${_graybash_name} ${_GB_RESET} ${_GB_DIM}grayscale prompts for ${who}@${host}${_GB_RESET}"
 }
 
 list_themes() {
@@ -136,13 +141,13 @@ list_themes() {
     ps1="$(theme_ps1 "$name")"
     preview="$(render_preview "$ps1")"
     preview="${preview//$'\n'/$'\n              '}"
-    printf '  %s%-10s%s %s%s%s\n' "$C_BOLD" "$name" "$C_RESET" "$C_FG" "$preview" "$C_RESET"
+    printf '  %s%-10s%s %s%s%s\n' "$_GB_BOLD" "$name" "$_GB_RESET" "$_GB_FG" "$preview" "$_GB_RESET"
   done
 }
 
 installed_theme() {
-  [[ -f "$BASHRC" ]] || return 1
-  awk -v b="$MARKER_BEGIN" -v e="$MARKER_END" '
+  [[ -f "$_graybash_bashrc" ]] || return 1
+  awk -v b="$_graybash_begin" -v e="$_graybash_end" '
     $0 == b { inblock=1; next }
     $0 == e { inblock=0 }
     inblock && $0 ~ /^# theme: / {
@@ -150,34 +155,34 @@ installed_theme() {
       print
       exit
     }
-  ' "$BASHRC"
+  ' "$_graybash_bashrc"
 }
 
 show_status() {
   local theme
   theme="$(installed_theme || true)"
   if [[ -n "$theme" ]]; then
-    say "Installed theme: ${C_BOLD}${theme}${C_RESET}"
-    say "Config: ${BASHRC}"
-    [[ -f "$BACKUP" ]] && say "Backup: ${BACKUP}"
+    say "Installed theme: ${_GB_BOLD}${theme}${_GB_RESET}"
+    say "Config: ${_graybash_bashrc}"
+    [[ -f "$_graybash_backup" ]] && say "Backup: ${_graybash_backup}"
   else
-    say "No graybash theme is installed in ${BASHRC}"
+    say "No graybash theme is installed in ${_graybash_bashrc}"
   fi
 }
 
 ensure_bashrc() {
-  if [[ ! -e "$BASHRC" ]]; then
-    printf '# ~/.bashrc  (created by graybash)\n' > "$BASHRC"
-  elif [[ ! -f "$BASHRC" ]]; then
-    die "Refusing to edit ${BASHRC}: not a regular file"
+  if [[ ! -e "$_graybash_bashrc" ]]; then
+    printf '# ~/.bashrc  (created by graybash)\n' > "$_graybash_bashrc"
+  elif [[ ! -f "$_graybash_bashrc" ]]; then
+    die "Refusing to edit ${_graybash_bashrc}: not a regular file"
     return 1
   fi
 }
 
 backup_bashrc() {
-  if [[ -f "$BASHRC" && ! -f "$BACKUP" ]]; then
-    cp -a "$BASHRC" "$BACKUP"
-    say "Backup created: ${BACKUP}"
+  if [[ -f "$_graybash_bashrc" && ! -f "$_graybash_backup" ]]; then
+    cp -a "$_graybash_bashrc" "$_graybash_backup"
+    say "Backup created: ${_graybash_backup}"
   fi
 }
 
@@ -190,7 +195,7 @@ strip_block() {
     die "Could not create a temporary file"
     return 1
   }
-  awk -v b="$MARKER_BEGIN" -v e="$MARKER_END" '
+  awk -v b="$_graybash_begin" -v e="$_graybash_end" '
     $0 == b { skip=1; next }
     $0 == e { skip=0; next }
     !skip { print }
@@ -203,22 +208,28 @@ strip_block() {
   if command -v chmod >/dev/null 2>&1 && chmod --reference="$file" "$tmp" 2>/dev/null; then
     :
   fi
-  mv "$tmp" "$file"
+  mv "$tmp" "$file" || {
+    rm -f "$tmp"
+    die "Failed to replace ${file}"
+    return 1
+  }
 }
 
 write_block() {
   local theme="$1" ps1="$2" dest="$3"
-  if [[ "$ps1" == *"'"* ]]; then
-    die "Internal error: theme '${theme}' PS1 contains a single quote"
-    return 1
-  fi
+  case "$ps1" in
+    *\'*)
+      die "Internal error: theme '${theme}' PS1 contains a single quote"
+      return 1
+      ;;
+  esac
   cat >> "$dest" <<EOF
 
-${MARKER_BEGIN}
+${_graybash_begin}
 # theme: ${theme}
 PROMPT_DIRTRIM=3
 PS1='${ps1}'
-${MARKER_END}
+${_graybash_end}
 EOF
 }
 
@@ -240,58 +251,61 @@ apply_theme() {
 
   ensure_bashrc || return 1
   backup_bashrc
-  strip_block "$BASHRC" || return 1
-  write_block "$theme" "$ps1" "$BASHRC" || return 1
+  strip_block "$_graybash_bashrc" || return 1
+  write_block "$theme" "$ps1" "$_graybash_bashrc" || return 1
   apply_to_current_shell "$ps1"
 
-  say "Applied ${C_BOLD}${theme}${C_RESET} to ${BASHRC}"
+  say "Applied ${_GB_BOLD}${theme}${_GB_RESET} to ${_graybash_bashrc}"
   if is_sourced; then
     say "This shell is using the new prompt now."
   else
-    say "Reload it with:  ${C_BOLD}source ${BASHRC}${C_RESET}"
+    say "Reload it with:  ${_GB_BOLD}source ${_graybash_bashrc}${_GB_RESET}"
     say "Or open a new terminal."
   fi
 }
 
 restore_default() {
-  if [[ -f "$BASHRC" ]]; then
-    strip_block "$BASHRC" || return 1
+  if [[ -f "$_graybash_bashrc" ]]; then
+    strip_block "$_graybash_bashrc" || return 1
   fi
 
   if is_sourced; then
     unset PROMPT_DIRTRIM 2>/dev/null || true
     # Reload bashrc so the account's original PS1 comes back.
-    if [[ -f "$BASHRC" ]]; then
+    if [[ -f "$_graybash_bashrc" ]]; then
       # shellcheck source=/dev/null
-      source "$BASHRC"
+      source "$_graybash_bashrc"
     else
       PS1='\u@\h:\w\$ '
     fi
   fi
 
-  say "Removed graybash prompt from ${BASHRC}"
+  say "Removed graybash prompt from ${_graybash_bashrc}"
   if ! is_sourced; then
-    say "Reload it with:  ${C_BOLD}source ${BASHRC}${C_RESET}"
+    say "Reload it with:  ${_GB_BOLD}source ${_graybash_bashrc}${_GB_RESET}"
   fi
 }
 
 try_theme() {
-  local theme="$1" ps1 rcfile
+  local theme="$1" ps1 rcfile st
   valid_theme "$theme" || {
     die "Unknown theme '${theme}'"
     return 1
   }
   ps1="$(theme_ps1 "$theme")"
-  rcfile="$(mktemp)"
+  rcfile="$(mktemp)" || {
+    die "Could not create a temporary file"
+    return 1
+  }
   {
-    [[ -f "$BASHRC" ]] && cat "$BASHRC"
+    [[ -f "$_graybash_bashrc" ]] && cat "$_graybash_bashrc"
     printf '\n# graybash try session (%s)\n' "$theme"
     printf 'PROMPT_DIRTRIM=3\n'
     printf "PS1='%s'\n" "$ps1"
   } > "$rcfile"
-  say "Trying ${C_BOLD}${theme}${C_RESET}. Type ${C_BOLD}exit${C_RESET} to leave the preview shell."
+  say "Trying ${_GB_BOLD}${theme}${_GB_RESET}. Type ${_GB_BOLD}exit${_GB_RESET} to leave the preview shell."
   bash --rcfile "$rcfile" -i
-  local st=$?
+  st=$?
   rm -f "$rcfile"
   return "$st"
 }
@@ -326,21 +340,23 @@ interactive_menu() {
   while true; do
     printf '\n'
     banner
-    say "${C_DIM}Custom prompts${C_RESET}"
-    say "  ${C_BOLD}1)${C_RESET} classic     $(render_preview "$(theme_ps1 classic)")"
-    say "  ${C_BOLD}2)${C_RESET} clock       $(render_preview "$(theme_ps1 clock)")"
-    say "  ${C_BOLD}3)${C_RESET} userhost    $(render_preview "$(theme_ps1 userhost)")"
-    say "  ${C_BOLD}4)${C_RESET} twoline     (two-line)"
+    say "${_GB_DIM}Custom prompts${_GB_RESET}"
+    say "  ${_GB_BOLD}1)${_GB_RESET} classic     $(render_preview "$(theme_ps1 classic)")"
+    say "  ${_GB_BOLD}2)${_GB_RESET} clock       $(render_preview "$(theme_ps1 clock)")"
+    say "  ${_GB_BOLD}3)${_GB_RESET} userhost    $(render_preview "$(theme_ps1 userhost)")"
+    say "  ${_GB_BOLD}4)${_GB_RESET} twoline"
     if supports_prompt_expand; then
-      # Render twoline on its own so the newline does not break the menu row.
-      printf '               %s\n' "$(render_preview "$(theme_ps1 twoline)")"
+      local twopreview
+      twopreview="$(render_preview "$(theme_ps1 twoline)")"
+      twopreview="${twopreview//$'\n'/$'\n               '}"
+      printf '               %s\n' "$twopreview"
     fi
     say ""
-    say "${C_DIM}Other${C_RESET}"
-    say "  ${C_BOLD}d)${C_RESET} default     restore the prompt from ${BASHRC}"
-    say "  ${C_BOLD}s)${C_RESET} status      show the installed theme"
-    say "  ${C_BOLD}t)${C_RESET} try         open a subshell with a theme"
-    say "  ${C_BOLD}q)${C_RESET} quit"
+    say "${_GB_DIM}Other${_GB_RESET}"
+    say "  ${_GB_BOLD}d)${_GB_RESET} default     restore the prompt from ${_graybash_bashrc}"
+    say "  ${_GB_BOLD}s)${_GB_RESET} status      show the installed theme"
+    say "  ${_GB_BOLD}t)${_GB_RESET} try         open a subshell with a theme"
+    say "  ${_GB_BOLD}q)${_GB_RESET} quit"
     printf '\n'
     show_status
     printf '\nSelect: '
@@ -383,7 +399,7 @@ interactive_menu() {
     esac
 
     preview_theme "$theme"
-    if confirm "Apply '${theme}' to ${BASHRC}? [Y/n] "; then
+    if confirm "Apply '${theme}' to ${_graybash_bashrc}? [Y/n] "; then
       apply_theme "$theme" || return 1
     else
       say "Cancelled."
@@ -424,13 +440,13 @@ main() {
       usage
       ;;
     *)
-      die "Unknown command '${cmd}'. Try: ${SCRIPT_NAME} help"
+      die "Unknown command '${cmd}'. Try: ${_graybash_name} help"
       return 1
       ;;
   esac
 }
 
-# Avoid leaking set -u / helper functions into the caller's shell when sourced.
+# Avoid leaking set -u / helper functions into the caller shell when sourced.
 __graybash_sourced=0
 if is_sourced; then
   __graybash_sourced=1
@@ -453,8 +469,8 @@ unset -f is_sourced say die usage theme_ps1 theme_names valid_theme \
   show_status ensure_bashrc backup_bashrc strip_block write_block \
   apply_to_current_shell apply_theme restore_default try_theme preview_theme \
   confirm interactive_menu main 2>/dev/null || true
-unset SCRIPT_NAME BASHRC BACKUP MARKER_BEGIN MARKER_END \
-  C_RESET C_HEAD C_DIM C_FG C_BOLD 2>/dev/null || true
+unset _graybash_name _graybash_bashrc _graybash_backup _graybash_begin _graybash_end \
+  _GB_RESET _GB_HEAD _GB_DIM _GB_FG _GB_BOLD 2>/dev/null || true
 
 if (( __graybash_sourced == 1 )); then
   unset __graybash_sourced __graybash_had_nounset
